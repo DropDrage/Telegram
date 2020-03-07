@@ -12,7 +12,9 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -28,8 +30,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.ui.Components.FireworksEffect;
@@ -37,6 +41,9 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.SnowflakesEffect;
 
 import java.util.ArrayList;
+
+import static org.telegram.ui.DialogsActivity.HIDE_IDS_CONFIG_KEY;
+import static org.telegram.ui.DialogsActivity.HIDE_IDS_CONFIG_NAME;
 
 public class ActionBar extends FrameLayout {
 
@@ -279,6 +286,17 @@ public class ActionBar extends FrameLayout {
         titleTextView.setGravity(Gravity.LEFT);
         titleTextView.setTextColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
         titleTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        titleTextView.setLongClickable(true);
+        titleTextView.setOnLongClickListener(v -> {
+            final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(HIDE_IDS_CONFIG_NAME, Activity.MODE_PRIVATE);
+            final SharedPreferences.Editor editor = preferences.edit();
+            editor.remove(HIDE_IDS_CONFIG_KEY);
+            editor.apply();
+
+            Toast.makeText(ApplicationLoader.applicationContext, "Telegram", Toast.LENGTH_SHORT).show();
+
+            return true;
+        });
         addView(titleTextView, 0, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
     }
 

@@ -35,17 +35,18 @@ import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.ui.ActionBar.Theme;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 public class RecyclerListView extends RecyclerView {
 
@@ -287,7 +288,6 @@ public class RecyclerListView extends RecyclerView {
     }
 
     public static class Holder extends ViewHolder {
-
         public Holder(View itemView) {
             super(itemView);
         }
@@ -331,6 +331,7 @@ public class RecyclerListView extends RecyclerView {
             int active = Theme.getColor(Theme.key_fastScrollActive);
             paint.setColor(inactive);
             letterPaint.setColor(Theme.getColor(Theme.key_fastScrollText));
+
             colors[0] = Color.red(inactive);
             colors[1] = Color.red(active);
             colors[2] = Color.green(inactive);
@@ -581,7 +582,7 @@ public class RecyclerListView extends RecyclerView {
                             child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                             child.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
                         }
-                    } else if (onItemLongClickListenerExtended != null) {
+                    } else {
                         if (onItemLongClickListenerExtended.onItemClick(currentChildView, currentChildPosition, event.getX() - currentChildView.getX(), event.getY() - currentChildView.getY())) {
                             child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                             child.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
@@ -597,7 +598,6 @@ public class RecyclerListView extends RecyclerView {
 
                 @Override
                 public void onShowPress(MotionEvent e) {
-
                 }
 
                 @Override
@@ -623,12 +623,14 @@ public class RecyclerListView extends RecyclerView {
                 float ey = event.getY();
                 longPressCalled = false;
                 ItemAnimator animator = getItemAnimator();
+
                 if ((allowItemsInteractionDuringAnimation || animator == null || !animator.isRunning()) && allowSelectChildAtPosition(ex, ey)) {
                     View v = findChildViewUnder(ex, ey);
                     if (v != null && allowSelectChildAtPosition(v)) {
                         currentChildView = v;
                     }
                 }
+
                 if (currentChildView instanceof ViewGroup) {
                     float x = event.getX() - currentChildView.getLeft();
                     float y = event.getY() - currentChildView.getTop();
@@ -644,6 +646,7 @@ public class RecyclerListView extends RecyclerView {
                         }
                     }
                 }
+
                 currentChildPosition = -1;
                 if (currentChildView != null) {
                     currentChildPosition = view.getChildPosition(currentChildView);
@@ -657,9 +660,7 @@ public class RecyclerListView extends RecyclerView {
 
             if (currentChildView != null && !interceptedByChild) {
                 try {
-                    if (event != null) {
-                        gestureDetector.onTouchEvent(event);
-                    }
+                    gestureDetector.onTouchEvent(event);
                 } catch (Exception e) {
                     FileLog.e(e);
                 }
@@ -669,12 +670,14 @@ public class RecyclerListView extends RecyclerView {
                 if (!interceptedByChild && currentChildView != null) {
                     float x = event.getX();
                     float y = event.getY();
+
                     selectChildRunnable = () -> {
                         if (selectChildRunnable != null && currentChildView != null) {
                             onChildPressed(currentChildView, x, y, true);
                             selectChildRunnable = null;
                         }
                     };
+
                     AndroidUtilities.runOnUIThread(selectChildRunnable, ViewConfiguration.getTapTimeout());
                     if (currentChildView.isEnabled()) {
                         positionSelector(currentChildPosition, currentChildView);
@@ -738,6 +741,7 @@ public class RecyclerListView extends RecyclerView {
                 final View child = getChildAt(i);
                 final float translationX = a == 0 ? child.getTranslationX() : 0;
                 final float translationY = a == 0 ? child.getTranslationY() : 0;
+
                 if (x >= child.getLeft() + translationX
                         && x <= child.getRight() + translationX
                         && y >= child.getTop() + translationY
@@ -776,6 +780,7 @@ public class RecyclerListView extends RecyclerView {
         if (pressedChild == null || selectorRect.isEmpty()) {
             return;
         }
+
         if (pressedChild.isEnabled()) {
             positionSelector(currentChildPosition, pressedChild);
             if (selectorDrawable != null) {
@@ -838,9 +843,7 @@ public class RecyclerListView extends RecyclerView {
     public int[] getResourceDeclareStyleableIntArray(String packageName, String name) {
         try {
             Field f = Class.forName(packageName + ".R$styleable").getField(name);
-            if (f != null) {
-                return (int[]) f.get(null);
-            }
+            return (int[]) f.get(null);
         } catch (Throwable t) {
             //ignore
         }
@@ -869,7 +872,6 @@ public class RecyclerListView extends RecyclerView {
             FileLog.e(e);
         }
         super.setOnScrollListener(new OnScrollListener() {
-
             @Override
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 if (newState != SCROLL_STATE_IDLE && currentChildView != null) {
@@ -963,6 +965,7 @@ public class RecyclerListView extends RecyclerView {
     public void checkSection() {
         if (scrollingByUser && fastScroll != null || sectionsType != 0 && sectionsAdapter != null) {
             LayoutManager layoutManager = getLayoutManager();
+
             if (layoutManager instanceof LinearLayoutManager) {
                 LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
                 if (linearLayoutManager.getOrientation() == LinearLayoutManager.VERTICAL) {
@@ -996,6 +999,7 @@ public class RecyclerListView extends RecyclerView {
                             if (minChild == null) {
                                 return;
                             }
+
                             ViewHolder holder = getChildViewHolder(minChild);
                             if (holder == null) {
                                 return;
@@ -1105,10 +1109,12 @@ public class RecyclerListView extends RecyclerView {
                             if (minChild == null) {
                                 return;
                             }
+
                             ViewHolder holder = getChildViewHolder(minChild);
                             if (holder == null) {
                                 return;
                             }
+
                             int firstVisibleItem = holder.getAdapterPosition();
                             int startSection = sectionsAdapter.getSectionForPosition(firstVisibleItem);
                             if (startSection < 0) {
@@ -1131,13 +1137,9 @@ public class RecyclerListView extends RecyclerView {
                             if (pos == count - 1) {
                                 int headerHeight = pinnedHeader.getHeight();
                                 int headerTop = paddingTop;
-                                if (minChild != null) {
-                                    int available = minChild.getTop() - paddingTop - sectionOffset + minChild.getHeight();
-                                    if (available < headerHeight) {
-                                        headerTop = available - headerHeight;
-                                    }
-                                } else {
-                                    headerTop = -AndroidUtilities.dp(100);
+                                int available = minChild.getTop() - paddingTop - sectionOffset + minChild.getHeight();
+                                if (available < headerHeight) {
+                                    headerTop = available - headerHeight;
                                 }
                                 if (headerTop < 0) {
                                     pinnedHeader.setTag(paddingTop + sectionOffsetY + headerTop);
@@ -1154,9 +1156,11 @@ public class RecyclerListView extends RecyclerView {
                         int firstVisibleItem = linearLayoutManager.findFirstVisibleItemPosition();
                         int lastVisibleItem = linearLayoutManager.findLastVisibleItemPosition();
                         int visibleItemCount = Math.abs(lastVisibleItem - firstVisibleItem) + 1;
+
                         if (firstVisibleItem == NO_POSITION) {
                             return;
                         }
+
                         if (scrollingByUser && fastScroll != null) {
                             Adapter adapter = getAdapter();
                             if (adapter instanceof FastScrollAdapter) {
@@ -1248,6 +1252,7 @@ public class RecyclerListView extends RecyclerView {
             AndroidUtilities.cancelRunOnUIThread(removeHighlighSelectionRunnable);
             removeHighlighSelectionRunnable = null;
         }
+
         RecyclerView.ViewHolder holder = findViewHolderForAdapterPosition(callback.run());
         if (holder != null) {
             positionSelector(holder.getLayoutPosition(), holder.itemView);
@@ -1260,7 +1265,8 @@ public class RecyclerListView extends RecyclerView {
                         ((TransitionDrawable) d).resetTransition();
                     }
                 }
-                if (Build.VERSION.SDK_INT >= 21) {
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     selectorDrawable.setHotspot(holder.itemView.getMeasuredWidth() / 2, holder.itemView.getMeasuredHeight() / 2);
                 }
             }
@@ -1269,6 +1275,7 @@ public class RecyclerListView extends RecyclerView {
                     invalidateDrawable(selectorDrawable);
                 }
             }
+
             AndroidUtilities.runOnUIThread(removeHighlighSelectionRunnable = () -> {
                 removeHighlighSelectionRunnable = null;
                 pendingHighlightPosition = null;
@@ -1335,6 +1342,7 @@ public class RecyclerListView extends RecyclerView {
         if (isHidden) {
             return;
         }
+
         isHidden = true;
         if (getVisibility() != GONE) {
             setVisibility(GONE);
@@ -1471,6 +1479,7 @@ public class RecyclerListView extends RecyclerView {
                 removeSelection(child, null);
             }
         }
+
         if (!animated) {
             selectorDrawable.setState(StateSet.NOTHING);
             selectorRect.setEmpty();
@@ -1496,7 +1505,7 @@ public class RecyclerListView extends RecyclerView {
     }
 
     @Override
-    public void onChildAttachedToWindow(View child) {
+    public void onChildAttachedToWindow(@NonNull View child) {
         if (getAdapter() instanceof SelectionAdapter) {
             ViewHolder holder = findContainingViewHolder(child);
             if (holder != null) {

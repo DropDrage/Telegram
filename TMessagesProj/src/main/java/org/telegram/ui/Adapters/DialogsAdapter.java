@@ -21,6 +21,10 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager.widget.ViewPager;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
@@ -43,19 +47,28 @@ import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.LoadingCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.UserCell;
-import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.DialogsActivity;
 
 import java.util.ArrayList;
 import java.util.Collections;
-
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.viewpager.widget.ViewPager;
+import java.util.List;
 
 public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
+
+    private static final int DIALOG_CELL = 0;
+    private static final int LOADING_CELL = 1;
+    private static final int RECENTLY_VIEWED_CELL = 2;
+    private static final int FRAME_CELL = 3;
+    private static final int DIALOG_ME_URL_CELL = 4;
+    private static final int DIALOG_EMPTY_CELL = 5;
+    private static final int USER_CELL = 6;
+    private static final int YOUR_CONTACTS_CELL = 7;
+    private static final int SHADOW_CELL = 8;
+    private static final int ARCHIVE_HINT_CELL = 9;
 
     private Context mContext;
     private ArchiveHintCell archiveHintCell;
@@ -85,7 +98,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
         if (folderId == 1) {
             SharedPreferences preferences = MessagesController.getGlobalMainSettings();
             showArchiveHint = preferences.getBoolean("archivehint", true);
-            preferences.edit().putBoolean("archivehint", false).commit();
+            preferences.edit().putBoolean("archivehint", false).apply();
             if (showArchiveHint) {
                 archiveHintCell = new ArchiveHintCell(context);
             }
@@ -100,15 +113,15 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
         return selectedDialogs != null && !selectedDialogs.isEmpty();
     }
 
-    public boolean addOrRemoveSelectedDialog(long did, View cell) {
-        if (selectedDialogs.contains(did)) {
-            selectedDialogs.remove(did);
+    public boolean addOrRemoveSelectedDialog(long dialogId, View cell) {
+        if (selectedDialogs.contains(dialogId)) {
+            selectedDialogs.remove(dialogId);
             if (cell instanceof DialogCell) {
                 ((DialogCell) cell).setChecked(false, true);
             }
             return false;
         } else {
-            selectedDialogs.add(did);
+            selectedDialogs.add(dialogId);
             if (cell instanceof DialogCell) {
                 ((DialogCell) cell).setChecked(true, true);
             }
@@ -141,7 +154,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
 
     @Override
     public int getItemCount() {
-        ArrayList<TLRPC.Dialog> array = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen);
+        final List<TLRPC.Dialog> array = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen);
         int dialogsCount = array.size();
         if (dialogsCount == 0 && (folderId != 0 || MessagesController.getInstance(currentAccount).isLoadingDialogs(folderId))) {
             onlineContacts = null;
@@ -180,6 +193,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 hasContacts = true;
             }
         }
+
         if (!hasContacts && onlineContacts != null) {
             onlineContacts = null;
         }
@@ -204,7 +218,8 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
         if (showArchiveHint) {
             i -= 2;
         }
-        ArrayList<TLRPC.Dialog> arrayList = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen);
+
+        final List<TLRPC.Dialog> arrayList = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen);
         if (hasHints) {
             int count = MessagesController.getInstance(currentAccount).hintDialogs.size();
             if (i < 2 + count) {
@@ -307,19 +322,20 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
         return viewType != 1 && viewType != 5 && viewType != 3 && viewType != 8 && viewType != 7 && viewType != 9 && viewType != 10;
     }
 
+    @NonNull
     @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-        View view;
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
+        final View view;
         switch (viewType) {
-            case 0:
+            case DIALOG_CELL:
                 DialogCell dialogCell = new DialogCell(mContext, true, false);
                 dialogCell.setArchivedPullAnimation(pullForegroundDrawable);
                 view = dialogCell;
                 break;
-            case 1:
+            case LOADING_CELL:
                 view = new LoadingCell(mContext);
                 break;
-            case 2: {
+            case RECENTLY_VIEWED_CELL: {
                 HeaderCell headerCell = new HeaderCell(mContext);
                 headerCell.setText(LocaleController.getString("RecentlyViewed", R.string.RecentlyViewed));
 
@@ -333,14 +349,14 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 textView.setOnClickListener(view1 -> {
                     MessagesController.getInstance(currentAccount).hintDialogs.clear();
                     SharedPreferences preferences = MessagesController.getGlobalMainSettings();
-                    preferences.edit().remove("installReferer").commit();
+                    preferences.edit().remove("installReferer").apply();
                     notifyDataSetChanged();
                 });
 
                 view = headerCell;
                 break;
             }
-            case 3:
+            case FRAME_CELL:
                 FrameLayout frameLayout = new FrameLayout(mContext) {
                     @Override
                     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -353,28 +369,28 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 frameLayout.addView(v, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
                 view = frameLayout;
                 break;
-            case 4:
+            case DIALOG_ME_URL_CELL:
                 view = new DialogMeUrlCell(mContext);
                 break;
-            case 5:
+            case DIALOG_EMPTY_CELL:
                 view = new DialogsEmptyCell(mContext);
                 break;
-            case 6:
+            case USER_CELL:
                 view = new UserCell(mContext, 8, 0, false);
                 break;
-            case 7:
+            case YOUR_CONTACTS_CELL:
                 HeaderCell headerCell = new HeaderCell(mContext);
                 headerCell.setText(LocaleController.getString("YourContacts", R.string.YourContacts));
                 view = headerCell;
                 break;
-            case 8:
+            case SHADOW_CELL:
                 view = new ShadowSectionCell(mContext);
                 Drawable drawable = Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow);
                 CombinedDrawable combinedDrawable = new CombinedDrawable(new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray)), drawable);
                 combinedDrawable.setFullsize(true);
                 view.setBackgroundDrawable(combinedDrawable);
                 break;
-            case 9:
+            case ARCHIVE_HINT_CELL:
                 view = archiveHintCell;
                 if (archiveHintCell.getParent() != null) {
                     ViewGroup parent = (ViewGroup) archiveHintCell.getParent();
@@ -389,6 +405,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                         int size = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen).size();
                         boolean hasArchive = MessagesController.getInstance(currentAccount).dialogs_dict.get(DialogObject.makeFolderDialogId(1)) != null;
                         int height;
+
                         if (size == 0 || !hasArchive) {
                             height = 0;
                         } else {
@@ -417,14 +434,15 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 };
             }
         }
-        view.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, viewType == 5 ? RecyclerView.LayoutParams.MATCH_PARENT : RecyclerView.LayoutParams.WRAP_CONTENT));
+        view.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
+                viewType == 5 ? RecyclerView.LayoutParams.MATCH_PARENT : RecyclerView.LayoutParams.WRAP_CONTENT));
         return new RecyclerListView.Holder(view);
     }
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int i) {
         switch (holder.getItemViewType()) {
-            case 0: {
+            case DIALOG_CELL: {
                 DialogCell cell = (DialogCell) holder.itemView;
                 TLRPC.Dialog dialog = (TLRPC.Dialog) getItem(i);
                 TLRPC.Dialog nextDialog = (TLRPC.Dialog) getItem(i + 1);
@@ -443,17 +461,17 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 cell.setDialog(dialog, dialogsType, folderId);
                 break;
             }
-            case 5: {
+            case DIALOG_EMPTY_CELL: {
                 DialogsEmptyCell cell = (DialogsEmptyCell) holder.itemView;
                 cell.setType(onlineContacts != null ? 1 : 0);
                 break;
             }
-            case 4: {
+            case DIALOG_ME_URL_CELL: {
                 DialogMeUrlCell cell = (DialogMeUrlCell) holder.itemView;
                 cell.setRecentMeUrl((TLRPC.RecentMeUrl) getItem(i));
                 break;
             }
-            case 6: {
+            case USER_CELL: {
                 UserCell cell = (UserCell) holder.itemView;
                 TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(onlineContacts.get(i - 3).user_id);
                 cell.setData(user, null, null, 0);
@@ -465,14 +483,15 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
     @Override
     public int getItemViewType(int i) {
         if (onlineContacts != null) {
-            if (i == 0) {
-                return 5;
-            } else if (i == 1) {
-                return 8;
-            } else if (i == 2) {
-                return 7;
-            } else {
-                return 6;
+            switch (i) {
+                case 0:
+                    return 5;
+                case 1:
+                    return 8;
+                case 2:
+                    return 7;
+                default:
+                    return 6;
             }
         } else if (hasHints) {
             int count = MessagesController.getInstance(currentAccount).hintDialogs.size();
@@ -495,6 +514,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
                 i -= 2;
             }
         }
+
         int size = DialogsActivity.getDialogsArray(currentAccount, dialogsType, folderId, dialogsListFrozen).size();
         if (i == size) {
             if (!MessagesController.getInstance(currentAccount).isDialogsEndReached(folderId)) {
@@ -507,7 +527,7 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter {
         } else if (i > size) {
             return 10;
         }
-        return 0;
+        return DIALOG_CELL;
     }
 
     @Override

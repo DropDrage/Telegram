@@ -36,12 +36,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
-
-import androidx.recyclerview.widget.ItemTouchHelper;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.LinearSmoothScrollerCustom;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -57,40 +51,53 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSmoothScrollerCustom;
+import androidx.recyclerview.widget.RecyclerView;
+
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatObject;
-import org.telegram.messenger.MediaDataController;
+import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.NotificationsController;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.XiaomiUtilities;
-import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.ContactsController;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.R;
-import org.telegram.messenger.UserConfig;
+import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.ActionBarMenu;
+import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.ActionBar.MenuDrawable;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Adapters.DialogsAdapter;
 import org.telegram.ui.Adapters.DialogsSearchAdapter;
 import org.telegram.ui.Cells.AccountSelectCell;
 import org.telegram.ui.Cells.ArchiveHintInnerCell;
+import org.telegram.ui.Cells.DialogCell;
 import org.telegram.ui.Cells.DialogsEmptyCell;
 import org.telegram.ui.Cells.DividerCell;
 import org.telegram.ui.Cells.DrawerActionCell;
@@ -105,41 +112,40 @@ import org.telegram.ui.Cells.ProfileSearchCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Cells.UserCell;
-import org.telegram.ui.Cells.DialogCell;
-import org.telegram.ui.ActionBar.ActionBar;
-import org.telegram.ui.ActionBar.ActionBarMenu;
-import org.telegram.ui.ActionBar.ActionBarMenuItem;
-import org.telegram.ui.ActionBar.BaseFragment;
-import org.telegram.ui.ActionBar.MenuDrawable;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedArrowDrawable;
-import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.ChatActivityEnterView;
 import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.DialogsItemAnimator;
-import org.telegram.ui.Components.FragmentContextView;
 import org.telegram.ui.Components.EmptyTextProgressView;
+import org.telegram.ui.Components.FragmentContextView;
 import org.telegram.ui.Components.JoinGroupAlert;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.NumberTextView;
 import org.telegram.ui.Components.PacmanAnimation;
 import org.telegram.ui.Components.ProxyDrawable;
+import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RadialProgressView;
 import org.telegram.ui.Components.RecyclerAnimationScrollHelper;
 import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.StickersAlert;
 import org.telegram.ui.Components.UndoView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DialogsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
-    
+
+    public static final String HIDE_IDS_CONFIG_NAME = "hideids";
+    public static final String HIDE_IDS_CONFIG_KEY = "ids";
+
     private DialogsRecyclerView listView;
     private RecyclerListView searchListView;
     private LinearLayoutManager layoutManager;
@@ -180,6 +186,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuItem deleteItem;
     private ActionBarMenuItem pinItem;
     private ActionBarMenuItem muteItem;
+    private ActionBarMenuItem hideItem;
     private ActionBarMenuSubItem archiveItem;
     private ActionBarMenuSubItem clearItem;
     private ActionBarMenuSubItem readItem;
@@ -252,7 +259,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private int canUnmuteCount;
     private int canClearCacheCount;
     private int canReportSpamCount;
-    
+
     private int folderId;
 
     private final static int pin = 100;
@@ -262,6 +269,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final static int mute = 104;
     private final static int archive = 105;
     private final static int block = 106;
+    private final static int hide = 107;
 
     private final static int ARCHIVE_ITEM_STATE_PINNED = 0;
     private final static int ARCHIVE_ITEM_STATE_SHOWED = 1;
@@ -599,44 +607,42 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     View view = layoutManager.findViewByPosition(currentPosition);
                     int height = (int) (AndroidUtilities.dp(SharedConfig.useThreeLinesLayout ? 78 : 72) * PullForegroundDrawable.SNAP_HEIGHT);
                     int diff = view.getTop() + view.getMeasuredHeight();
-                    if (view != null) {
-                        long pullingTime = System.currentTimeMillis() - startArchivePullingTime;
-                        if (diff < height || pullingTime < PullForegroundDrawable.minPullingTime) {
-                            listView.smoothScrollBy(0, diff, CubicBezierInterpolator.EASE_OUT_QUINT);
-                            archivePullViewState = ARCHIVE_ITEM_STATE_HIDDEN;
-                        } else {
-                            if (archivePullViewState != ARCHIVE_ITEM_STATE_SHOWED) {
-                                if (listView.getViewOffset() == 0) {
-                                    listView.smoothScrollBy(0, view.getTop(), CubicBezierInterpolator.EASE_OUT_QUINT);
-                                }
-                                if (!canShowHiddenArchive) {
-                                    canShowHiddenArchive = true;
-                                    listView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-                                    if (pullForegroundDrawable != null) {
-                                        pullForegroundDrawable.colorize(true);
-                                    }
-                                }
-                                ((DialogCell) view).startOutAnimation();
-                                archivePullViewState = ARCHIVE_ITEM_STATE_SHOWED;
+                    long pullingTime = System.currentTimeMillis() - startArchivePullingTime;
+                    if (diff < height || pullingTime < PullForegroundDrawable.minPullingTime) {
+                        listView.smoothScrollBy(0, diff, CubicBezierInterpolator.EASE_OUT_QUINT);
+                        archivePullViewState = ARCHIVE_ITEM_STATE_HIDDEN;
+                    } else {
+                        if (archivePullViewState != ARCHIVE_ITEM_STATE_SHOWED) {
+                            if (listView.getViewOffset() == 0) {
+                                listView.smoothScrollBy(0, view.getTop(), CubicBezierInterpolator.EASE_OUT_QUINT);
                             }
-                        }
-
-                        if (listView.getViewOffset() != 0) {
-                            ValueAnimator valueAnimator = ValueAnimator.ofFloat(listView.getViewOffset(), 0f);
-                            valueAnimator.addUpdateListener(animation -> listView.setViewsOffset((float) animation.getAnimatedValue()));
-
-                            valueAnimator.setDuration((long) (350f - 120f * (listView.getViewOffset() / PullForegroundDrawable.getMaxOverscroll())));
-                            valueAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
-                            listView.setScrollEnabled(false);
-                            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                                @Override
-                                public void onAnimationEnd(Animator animation) {
-                                    super.onAnimationEnd(animation);
-                                    listView.setScrollEnabled(true);
+                            if (!canShowHiddenArchive) {
+                                canShowHiddenArchive = true;
+                                listView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                                if (pullForegroundDrawable != null) {
+                                    pullForegroundDrawable.colorize(true);
                                 }
-                            });
-                            valueAnimator.start();
+                            }
+                            ((DialogCell) view).startOutAnimation();
+                            archivePullViewState = ARCHIVE_ITEM_STATE_SHOWED;
                         }
+                    }
+
+                    if (listView.getViewOffset() != 0) {
+                        ValueAnimator valueAnimator = ValueAnimator.ofFloat(listView.getViewOffset(), 0f);
+                        valueAnimator.addUpdateListener(animation -> listView.setViewsOffset((float) animation.getAnimatedValue()));
+
+                        valueAnimator.setDuration((long) (350f - 120f * (listView.getViewOffset() / PullForegroundDrawable.getMaxOverscroll())));
+                        valueAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                        listView.setScrollEnabled(false);
+                        valueAnimator.addListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                super.onAnimationEnd(animation);
+                                listView.setScrollEnabled(true);
+                            }
+                        });
+                        valueAnimator.start();
                     }
                 }
             }
@@ -697,10 +703,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         @Override
-        public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder source, RecyclerView.ViewHolder target) {
+        public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder source, RecyclerView.ViewHolder target) {
             if (!(target.itemView instanceof DialogCell)) {
                 return false;
             }
+
             DialogCell dialogCell = (DialogCell) target.itemView;
             long dialogId = dialogCell.getDialogId();
             TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(dialogId);
@@ -990,11 +997,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         delegate = null;
     }
 
+    private Context context;
+
     @Override
     public View createView(final Context context) {
         searching = false;
         searchWas = false;
         pacmanAnimation = null;
+        this.context = context;
 
         AndroidUtilities.runOnUIThread(() -> Theme.createChatResources(context, false));
 
@@ -1107,7 +1117,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 actionBar.setTitle(LocaleController.getString("ArchivedChats", R.string.ArchivedChats));
             } else {
                 if (BuildVars.DEBUG_VERSION) {
-                    actionBar.setTitle("Telegram Beta");
+                    actionBar.setTitle("Telegram");
                 } else {
                     actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName));
                 }
@@ -1174,7 +1184,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     DialogsActivity dialogsActivity = new DialogsActivity(arguments);
                     dialogsActivity.setDelegate(oldDelegate);
                     launchActivity.presentFragment(dialogsActivity, false, true);
-                } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block) {
+                } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == hide) {
                     perfromSelectedDialogsAction(id, true);
                 }
             }
@@ -1195,6 +1205,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         actionMode.addView(selectedDialogsCountTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, 72, 0, 0, 0));
         selectedDialogsCountTextView.setOnTouchListener((v, event) -> true);
 
+        hideItem = actionMode.addItemWithWidth(hide, 0, AndroidUtilities.dp(54), LocaleController.getString("HideOnTop", R.string.HideOnTop));
         pinItem = actionMode.addItemWithWidth(pin, R.drawable.msg_pin, AndroidUtilities.dp(54));
         muteItem = actionMode.addItemWithWidth(mute, R.drawable.msg_archive, AndroidUtilities.dp(54));
         deleteItem = actionMode.addItemWithWidth(delete, R.drawable.msg_delete, AndroidUtilities.dp(54), LocaleController.getString("Delete", R.string.Delete));
@@ -1204,6 +1215,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         clearItem = otherItem.addSubItem(clear, R.drawable.msg_clear, LocaleController.getString("ClearHistory", R.string.ClearHistory));
         blockItem = otherItem.addSubItem(block, R.drawable.msg_block, LocaleController.getString("BlockUser", R.string.BlockUser));
 
+        actionModeViews.add(hideItem);
         actionModeViews.add(pinItem);
         actionModeViews.add(muteItem);
         actionModeViews.add(deleteItem);
@@ -1581,7 +1593,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         floatingButton = new ImageView(context);
         floatingButton.setScaleType(ImageView.ScaleType.CENTER);
         Drawable drawable = Theme.createSimpleSelectorCircleDrawable(AndroidUtilities.dp(56), Theme.getColor(Theme.key_chats_actionBackground), Theme.getColor(Theme.key_chats_actionPressedBackground));
-        if (Build.VERSION.SDK_INT < 21) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             Drawable shadowDrawable = context.getResources().getDrawable(R.drawable.floating_shadow).mutate();
             shadowDrawable.setColorFilter(new PorterDuffColorFilter(0xff000000, PorterDuff.Mode.MULTIPLY));
             CombinedDrawable combinedDrawable = new CombinedDrawable(shadowDrawable, drawable, 0, 0);
@@ -1591,7 +1603,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         floatingButton.setBackgroundDrawable(drawable);
         floatingButton.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_chats_actionIcon), PorterDuff.Mode.MULTIPLY));
         floatingButton.setImageResource(R.drawable.floating_pencil);
-        if (Build.VERSION.SDK_INT >= 21) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             StateListAnimator animator = new StateListAnimator();
             animator.addState(new int[]{android.R.attr.state_pressed}, ObjectAnimator.ofFloat(floatingButton, View.TRANSLATION_Z, AndroidUtilities.dp(2), AndroidUtilities.dp(4)).setDuration(200));
             animator.addState(new int[]{}, ObjectAnimator.ofFloat(floatingButton, View.TRANSLATION_Z, AndroidUtilities.dp(4), AndroidUtilities.dp(2)).setDuration(200));
@@ -1758,9 +1770,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     RecyclerView.ViewHolder holder = recyclerView.findContainingViewHolder(topChild);
                     if (!hasHiddenArchive() || holder != null && holder.getAdapterPosition() != 0) {
                         int firstViewTop = 0;
-                        if (topChild != null) {
-                            firstViewTop = topChild.getTop();
-                        }
+                        firstViewTop = topChild.getTop();
                         boolean goingDown;
                         boolean changed = true;
                         if (prevPosition == firstVisibleItem) {
@@ -2272,8 +2282,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         long dialogId = 0;
         int message_id = 0;
         boolean isGlobalSearch = false;
+
         if (adapter == dialogsAdapter) {
             TLObject object = dialogsAdapter.getItem(position);
+
             if (object instanceof TLRPC.User) {
                 dialogId = ((TLRPC.User) object).id;
             } else if (object instanceof TLRPC.Dialog) {
@@ -2621,8 +2633,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (getParentActivity() == null) {
             return;
         }
+
         ArrayList<Long> selectedDialogs = dialogsAdapter.getSelectedDialogs();
         int count = selectedDialogs.size();
+
         if (action == archive) {
             ArrayList<Long> copy = new ArrayList<>(selectedDialogs);
             getMessagesController().addDialogToFolder(copy, folderId == 0 ? 1 : 0, -1, null, 0);
@@ -2758,7 +2772,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 hideActionMode(false);
             });
             return;
+        } else if (action == hide) {
+            final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(HIDE_IDS_CONFIG_NAME, Activity.MODE_PRIVATE);
+            final SharedPreferences.Editor editor = preferences.edit();
+
+            final Set<String> hiddenIds = preferences.getStringSet(HIDE_IDS_CONFIG_KEY, new HashSet<>());
+            selectedDialogs.forEach(selectedDialog -> hiddenIds.add(selectedDialog.toString()));
+            editor.remove(HIDE_IDS_CONFIG_KEY);
+            editor.apply();
+
+            editor.putStringSet(HIDE_IDS_CONFIG_KEY, hiddenIds);
+            editor.apply();
         }
+
         boolean scrollToTop = false;
         for (int a = 0; a < count; a++) {
             long selectedDialog = selectedDialogs.get(a);
@@ -2933,6 +2959,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (hide) {
             return;
         }
+
         ArrayList<Long> selectedDialogs = dialogsAdapter.getSelectedDialogs();
         int count = selectedDialogs.size();
         int selfUserId = getUserConfig().getClientUserId();
@@ -2972,7 +2999,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 if (MessagesController.isSupportUser(user)) {
                     cantBlockCount++;
                 } else {
-                    if (lower_id == 0 || preferences.getBoolean("dialog_bar_report" + selectedDialog, true)) {
+                    if (preferences.getBoolean("dialog_bar_report" + selectedDialog, true)) {
                         canReportSpamCount++;
                     }
                 }
@@ -2980,7 +3007,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
             if (DialogObject.isChannel(dialog)) {
                 final TLRPC.Chat chat = getMessagesController().getChat(-lower_id);
-                CharSequence[] items;
                 if (getMessagesController().isProxyDialog(dialog.id, true)) {
                     canClearCacheCount++;
                 } else {
@@ -3101,6 +3127,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         dialogsAdapter.addOrRemoveSelectedDialog(dialog.id, cell);
         ArrayList<Long> selectedDialogs = dialogsAdapter.getSelectedDialogs();
         boolean updateAnimated = false;
+
         if (actionBar.isActionModeShowed()) {
             if (selectedDialogs.isEmpty()) {
                 hideActionMode(true);
@@ -3406,7 +3433,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         if (grantResults[a] == PackageManager.PERMISSION_GRANTED) {
                             getContactsController().forceImportContacts();
                         } else {
-                            MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts", askAboutContacts = false).commit();
+                            MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts", askAboutContacts = false).apply();
                         }
                         break;
                     case Manifest.permission.WRITE_EXTERNAL_STORAGE:
@@ -3582,23 +3609,36 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (frozen && frozenDialogsList != null) {
             return frozenDialogsList;
         }
+
         MessagesController messagesController = AccountInstance.getInstance(currentAccount).getMessagesController();
+        ArrayList<TLRPC.Dialog> dialogs = null;
         if (dialogsType == 0) {
-            return messagesController.getDialogs(folderId);
+            dialogs = messagesController.getDialogs(folderId);
         } else if (dialogsType == 1) {
-            return messagesController.dialogsServerOnly;
+            dialogs = messagesController.dialogsServerOnly;
         } else if (dialogsType == 2) {
-            return messagesController.dialogsCanAddUsers;
+            dialogs = messagesController.dialogsCanAddUsers;
         } else if (dialogsType == 3) {
-            return messagesController.dialogsForward;
+            dialogs = messagesController.dialogsForward;
         } else if (dialogsType == 4) {
-            return messagesController.dialogsUsersOnly;
+            dialogs = messagesController.dialogsUsersOnly;
         } else if (dialogsType == 5) {
-            return messagesController.dialogsChannelsOnly;
+            dialogs = messagesController.dialogsChannelsOnly;
         } else if (dialogsType == 6) {
-            return messagesController.dialogsGroupsOnly;
+            dialogs = messagesController.dialogsGroupsOnly;
         }
-        return null;
+
+        if (dialogs != null) {
+            final SharedPreferences sharedPreferences = ApplicationLoader.applicationContext.getSharedPreferences(HIDE_IDS_CONFIG_NAME, Activity.MODE_PRIVATE);
+            final Set<String> idsSet = sharedPreferences.getStringSet(HIDE_IDS_CONFIG_KEY, Collections.emptySet());
+            for (int i = 0; i < dialogs.size(); i++) {
+                if (idsSet.contains(String.valueOf(dialogs.get(i).id))) {
+                    dialogs.remove(i--);
+                }
+            }
+        }
+
+        return dialogs;
     }
 
     public void setSideMenu(RecyclerView recyclerView) {
@@ -3631,7 +3671,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         floatingHidden = hide;
         AnimatorSet animatorSet = new AnimatorSet();
-        ValueAnimator valueAnimator = ValueAnimator.ofFloat(floatingButtonHideProgress,floatingHidden ? 1f : 0f);
+        ValueAnimator valueAnimator = ValueAnimator.ofFloat(floatingButtonHideProgress, floatingHidden ? 1f : 0f);
         valueAnimator.addUpdateListener(animation -> {
             floatingButtonHideProgress = (float) animation.getAnimatedValue();
             floatingButtonTranslation = AndroidUtilities.dp(100) * floatingButtonHideProgress;
