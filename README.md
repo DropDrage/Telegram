@@ -6,8 +6,8 @@ This repo based the official source code for [Telegram App for Android](https://
 <br/>
 
 Main Difference from *Original* is possibility to hide dialogs.
-- *To Hide Dialog* select it and press the hidden button (left one after most left menu item in AppBar) and wait for Dialogs Update or restart Telegram.<br/>
-- *To Show Hidden Dialogs* do long click on AppBar until `Telegram` message will shown and wait for Dialogs Update or restart Telegram.
+- *To Hide Dialog* select it and press the hidden button (left one after most left menu item in AppBar) and wait for Dialogs Update *or* Scroll up and down *or* restart Telegram.<br/>
+- *To Show Hidden Dialogs* do long click on AppBar until `Telegram` message will shown and restart Telegram.
 
 **Warning!** Notifications still arrive! So **disable** them **before hide**.
 
